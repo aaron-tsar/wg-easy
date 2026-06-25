@@ -2,7 +2,9 @@
   <main v-if="data">
     <Panel>
       <PanelHead>
-        <PanelHeadTitle :text="data.name" />
+        <PanelHeadTitle>
+          {{ data.name }}
+        </PanelHeadTitle>
       </PanelHead>
       <PanelBody>
         <FormElement @submit.prevent="submit">
@@ -60,6 +62,12 @@
               v-model="data.serverAllowedIps"
               name="serverAllowedIps"
             />
+          </FormGroup>
+          <FormGroup v-if="globalStore.information?.firewallEnabled">
+            <FormHeading :description="$t('client.firewallIpsDesc')">
+              {{ $t('client.firewallIps') }}
+            </FormHeading>
+            <FormNullArrayField v-model="data.firewallIps" name="firewallIps" />
           </FormGroup>
           <FormGroup>
             <FormHeading :description="$t('client.dnsDesc')">
@@ -141,25 +149,25 @@
             <FormHeading :description="$t('client.hooksDescription')">
               {{ $t('client.hooks') }}
             </FormHeading>
-            <FormTextField
+            <FormTextArea
               id="PreUp"
               v-model="data.preUp"
               :description="$t('client.hooksLeaveEmpty')"
               :label="$t('hooks.preUp')"
             />
-            <FormTextField
+            <FormTextArea
               id="PostUp"
               v-model="data.postUp"
               :description="$t('client.hooksLeaveEmpty')"
               :label="$t('hooks.postUp')"
             />
-            <FormTextField
+            <FormTextArea
               id="PreDown"
               v-model="data.preDown"
               :description="$t('client.hooksLeaveEmpty')"
               :label="$t('hooks.preDown')"
             />
-            <FormTextField
+            <FormTextArea
               id="PostDown"
               v-model="data.postDown"
               :description="$t('client.hooksLeaveEmpty')"
@@ -180,9 +188,7 @@
             >
               <FormSecondaryActionField
                 :label="$t('client.delete')"
-                class="w-full"
-                type="button"
-                tabindex="-1"
+                class="inline-block w-full"
                 as="span"
               />
             </ClientsDeleteDialog>
@@ -192,9 +198,7 @@
             >
               <FormSecondaryActionField
                 :label="$t('client.viewConfig')"
-                class="w-full"
-                type="button"
-                tabindex="-1"
+                class="inline-block w-full"
                 as="span"
               />
             </ClientsConfigDialog>
@@ -206,9 +210,7 @@
 </template>
 
 <script lang="ts" setup>
-const authStore = useAuthStore();
 const globalStore = useGlobalStore();
-authStore.update();
 
 const route = useRoute();
 const id = route.params.id as string;
@@ -219,10 +221,11 @@ const { data: _data, refresh } = await useFetch(`/api/client/${id}`, {
 const data = toRef(_data.value);
 
 const _submit = useSubmit(
-  `/api/client/${id}`,
-  {
-    method: 'post',
-  },
+  (data) =>
+    $fetch(`/api/client/${id}`, {
+      method: 'post',
+      body: data,
+    }),
   {
     revert: async (success) => {
       if (success) {
@@ -244,10 +247,11 @@ async function revert() {
 }
 
 const _deleteClient = useSubmit(
-  `/api/client/${id}`,
-  {
-    method: 'delete',
-  },
+  (data) =>
+    $fetch(`/api/client/${id}`, {
+      method: 'delete',
+      body: data,
+    }),
   {
     revert: async () => {
       await navigateTo('/');

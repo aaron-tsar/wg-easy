@@ -4,6 +4,7 @@ import uk from './locales/uk.json';
 import fr from './locales/fr.json';
 import de from './locales/de.json';
 import it from './locales/it.json';
+import ja from './locales/ja.json';
 import ru from './locales/ru.json';
 import zhhk from './locales/zh-HK.json';
 import zhcn from './locales/zh-CN.json';
@@ -14,6 +15,13 @@ import ptbr from './locales/pt-BR.json';
 import tr from './locales/tr.json';
 import bn from './locales/bn.json';
 import id from './locales/id.json';
+import nl from './locales/nl.json';
+import nb from './locales/nb.json';
+import bg from './locales/bg.json';
+import hi from './locales/hi.json';
+import gl from './locales/gl.json';
+import cs from './locales/cs.json';
+import vi from './locales/vi.json';
 
 export default defineI18nConfig(() => ({
   legacy: false,
@@ -25,6 +33,7 @@ export default defineI18nConfig(() => ({
     fr,
     de,
     it,
+    ja,
     ru,
     'zh-HK': zhhk,
     'zh-CN': zhcn,
@@ -35,5 +44,12 @@ export default defineI18nConfig(() => ({
     tr,
     bn,
     id,
+    nl,
+    nb,
+    bg,
+    hi,
+    gl,
+    cs,
+    vi,
   },
 }));

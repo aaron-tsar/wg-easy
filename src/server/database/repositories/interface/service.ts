@@ -1,7 +1,10 @@
 import { eq, sql } from 'drizzle-orm';
 import { parseCidr } from 'cidr-tools';
+
 import { wgInterface } from './schema';
 import type { InterfaceCidrUpdateType, InterfaceUpdateType } from './types';
+
+import { nextIP } from '#server/utils/ip';
 import { client as clientSchema } from '#db/schema';
 import type { DBType } from '#db/sqlite';
 
@@ -15,6 +18,13 @@ function createPreparedStatement(db: DBType) {
       .set({
         privateKey: sql.placeholder('privateKey') as never as string,
         publicKey: sql.placeholder('publicKey') as never as string,
+      })
+      .where(eq(wgInterface.name, sql.placeholder('interface')))
+      .prepare(),
+    setFirewallEnabled: db
+      .update(wgInterface)
+      .set({
+        firewallEnabled: sql.placeholder('firewallEnabled') as never as boolean,
       })
       .where(eq(wgInterface.name, sql.placeholder('interface')))
       .prepare(),
@@ -54,6 +64,13 @@ export class InterfaceService {
       .set(data)
       .where(eq(wgInterface.name, 'wg0'))
       .execute();
+  }
+
+  setFirewallEnabled(firewallEnabled: boolean) {
+    return this.#statements.setFirewallEnabled.execute({
+      interface: 'wg0',
+      firewallEnabled,
+    });
   }
 
   updateCidr(data: InterfaceCidrUpdateType) {

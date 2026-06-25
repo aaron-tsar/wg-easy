@@ -1,6 +1,9 @@
-import type { ZodSchema } from 'zod';
+import { useTranslation } from '@intlify/h3';
+import type { ZodType } from 'zod';
 import z from 'zod';
 import type { H3Event, EventHandlerRequest } from 'h3';
+import { isIP } from 'is-ip';
+import isCidr from 'is-cidr';
 
 export type ID = number;
 
@@ -18,6 +21,15 @@ export const safeStringRefine = z
     { message: t('zod.stringMalformed') }
   );
 
+function hasControlChars(str: string) {
+  // eslint-disable-next-line no-control-regex
+  return /[\x00-\x1F\x7F]/.test(str);
+}
+
+export const controlStringRefine = z
+  .string()
+  .refine((v) => !hasControlChars(v), { message: t('zod.stringMalformed') });
+
 export const EnabledSchema = z.boolean({ message: t('zod.enabled') });
 
 export const MtuSchema = z
@@ -34,9 +46,45 @@ export const JmaxSchema = z.number().max(1280).nullable();
 
 export const SSchema = z.number().max(1132).nullable();
 
-export const HSchema = z.number().min(5).max(2147483647).nullable();
+const H_MIN = 5;
+const H_MAX = 2 ** 31 - 1;
 
-export const ISchema = z.string().nullable();
+export const HSchema = z
+  .string()
+  .transform((v) => v.replace(/\s+/g, ''))
+  .refine(
+    (v) => {
+      if (!v) return false;
+
+      if (!/^\d+(-\d+)?$/.test(v)) return false;
+
+      if (!v.includes('-')) {
+        const num = Number(v);
+        return num >= H_MIN && num <= H_MAX;
+      }
+
+      const [min, max] = v.split('-').map(Number);
+      return min && max && min >= H_MIN && max <= H_MAX && min <= max;
+
+      return false;
+    },
+    {
+      message: t('zod.generic.validNumberRange'),
+    }
+  )
+  .transform((v) => {
+    if (!v.includes('-')) return `${Number(v)}`;
+
+    const [min, max] = v.split('-').map(Number);
+    return min === max ? `${min}` : `${min}-${max}`;
+  })
+  .nullable();
+
+export const ISchema = z
+  .string()
+  .pipe(safeStringRefine)
+  .pipe(controlStringRefine)
+  .nullable();
 
 export const PortSchema = z
   .number({ message: t('zod.port') })
@@ -51,13 +99,73 @@ export const PersistentKeepaliveSchema = z
 export const AddressSchema = z
   .string({ message: t('zod.address') })
   .min(1, { message: t('zod.address') })
-  .pipe(safeStringRefine);
+  .pipe(safeStringRefine)
+  .pipe(controlStringRefine);
 
 export const DnsSchema = z.array(AddressSchema, { message: t('zod.dns') });
 
 export const AllowedIpsSchema = z
   .array(AddressSchema, { message: t('zod.allowedIps') })
   .min(1, { message: t('zod.allowedIps') });
+
+// Validation for firewall IP entries
+const FirewallIpEntrySchema = z
+  .string({ message: t('zod.client.firewallIps') })
+  .min(1, { message: t('zod.client.firewallIps') })
+  .refine(
+    (entry) => {
+      // Check if protocol suffix is present
+      const hasProto = /\/(tcp|udp)$/i.test(entry);
+      const entryWithoutProto = entry.replace(/\/(tcp|udp)$/i, '');
+
+      // If protocol was specified without a port, it's invalid
+      if (hasProto) {
+        // Protocol requires port, so check for IP:port format
+        const portMatch = entryWithoutProto.match(/^(.+):(\d+)$/);
+        if (!portMatch) {
+          return false;
+        }
+        const [, ipPart, portPart] = portMatch;
+        const port = parseInt(portPart!, 10);
+        const cleanIp = ipPart!.replace(/^\[|\]$/g, '');
+        return (isIP(cleanIp) || isCidr(cleanIp)) && port >= 1 && port <= 65535;
+      }
+
+      // Check if it's just IP or CIDR first (handles IPv6 addresses)
+      if (isIP(entryWithoutProto) || isCidr(entryWithoutProto)) {
+        return true;
+      }
+
+      // Check if it's bracketed IPv6 without port: [::1]
+      const bracketedMatch = entryWithoutProto.match(/^\[(.+)\]$/);
+      if (bracketedMatch) {
+        const innerIp = bracketedMatch[1];
+        return isIP(innerIp!) || isCidr(innerIp!);
+      }
+
+      // Check if it's IP:port format (IPv4:port or [IPv6]:port)
+      const portMatch = entryWithoutProto.match(/^(.+):(\d+)$/);
+      if (portMatch) {
+        const [, ipPart, portPart] = portMatch;
+        const port = parseInt(portPart!, 10);
+
+        // Remove IPv6 brackets if present
+        const cleanIp = ipPart!.replace(/^\[|\]$/g, '');
+
+        // Validate IP and port
+        return (isIP(cleanIp) || isCidr(cleanIp)) && port >= 1 && port <= 65535;
+      }
+
+      return false;
+    },
+    {
+      message: t('zod.client.firewallIpsInvalid'),
+    }
+  );
+
+export const FirewallIpsSchema = z.array(FirewallIpEntrySchema, {
+  message: t('zod.client.firewallIps'),
+});
 
 export const FileSchema = z.object({
   file: z.string({ message: t('zod.file') }),
@@ -75,7 +183,7 @@ export const schemaForType =
   };
 
 export function validateZod<T>(
-  schema: ZodSchema<T>,
+  schema: ZodType<T>,
   event: H3Event<EventHandlerRequest>
 ) {
   return async (data: unknown) => {
@@ -106,6 +214,22 @@ export function validateZod<T>(
                         newMessage = t('zod.generic.numberMin', [
                           t(v.message),
                           v.minimum,
+                        ]);
+                        break;
+                    }
+                    break;
+                  case 'too_big':
+                    switch (v.origin) {
+                      case 'string':
+                        newMessage = t('zod.generic.stringMax', [
+                          t(v.message),
+                          v.maximum,
+                        ]);
+                        break;
+                      case 'number':
+                        newMessage = t('zod.generic.numberMax', [
+                          t(v.message),
+                          v.maximum,
                         ]);
                         break;
                     }
@@ -154,6 +278,7 @@ export function validateZod<T>(
           })
           .join('; ');
       }
+      // eslint-disable-next-line preserve-caught-error
       throw new Error(message);
     }
   };
@@ -165,3 +290,5 @@ export function validateZod<T>(
 export function assertUnreachable(_: never): never {
   throw new Error("Didn't expect to get here");
 }
+
+export const typesTestExports = { FirewallIpEntrySchema };

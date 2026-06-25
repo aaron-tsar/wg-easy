@@ -1,9 +1,13 @@
+import { defineEventHandler, getRequestURL, sendRedirect } from 'h3';
+
+import Database from '#server/utils/Database';
+
 /* First setup of wg-easy */
 export default defineEventHandler(async (event) => {
   const url = getRequestURL(event);
 
   // User can't be logged in, and public routes can be accessed whenever
-  if (url.pathname.startsWith('/api/')) {
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/_i18n/')) {
     return;
   }
 

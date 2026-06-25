@@ -1,9 +1,12 @@
 export const useGlobalStore = defineStore('Global', () => {
-  const { data: information } = useFetch('/api/information', {
-    method: 'get',
-  });
+  const { data: information, refresh: refreshInformation } = useFetch(
+    '/api/information',
+    {
+      method: 'get',
+    }
+  );
 
-  const sortClient = ref(true); // Sort clients by name, true = asc, false = desc
+  const sortClient = ref<'asc' | 'desc'>('asc');
 
   const uiShowCharts = useCookie<boolean>('uiShowCharts', {
     default: () => false,
@@ -22,6 +25,7 @@ export const useGlobalStore = defineStore('Global', () => {
   return {
     sortClient,
     information,
+    refreshInformation,
     uiShowCharts,
     toggleCharts,
     uiChartType,

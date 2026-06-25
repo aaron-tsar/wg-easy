@@ -2,10 +2,7 @@ import { fileURLToPath } from 'node:url';
 
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
-  future: {
-    compatibilityVersion: 4,
-  },
-  compatibilityDate: '2025-02-04',
+  compatibilityDate: '2026-06-19',
   devtools: { enabled: true },
   modules: [
     '@nuxtjs/i18n',
@@ -15,6 +12,7 @@ export default defineNuxtConfig({
     'radix-vue/nuxt',
     '@vueuse/nuxt',
     '@nuxt/eslint',
+    '@nuxt/test-utils/module',
   ],
   colorMode: {
     preference: 'system',
@@ -22,6 +20,7 @@ export default defineNuxtConfig({
     classSuffix: '',
     cookieName: 'theme',
   },
+  css: ['~/app.css'],
   i18n: {
     // https://i18n.nuxtjs.org/docs/guide/server-side-translations
     experimental: {
@@ -48,6 +47,11 @@ export default defineNuxtConfig({
         code: 'it',
         language: 'it-IT',
         name: 'Italiano',
+      },
+      {
+        code: 'ja',
+        language: 'ja-JP',
+        name: '日本語',
       },
       {
         code: 'fr',
@@ -90,6 +94,11 @@ export default defineNuxtConfig({
         name: 'Polski',
       },
       {
+        code: 'cs',
+        language: 'cs-CZ',
+        name: 'Čeština',
+      },
+      {
         code: 'pt-BR',
         language: 'pt-BR',
         name: 'Português (Brasil)',
@@ -109,6 +118,36 @@ export default defineNuxtConfig({
         language: 'id-ID',
         name: 'Bahasa Indonesia',
       },
+      {
+        code: 'nl',
+        language: 'nl-NL',
+        name: 'Nederlands',
+      },
+      {
+        code: 'nb',
+        language: 'nb-NO',
+        name: 'Norsk bokmål',
+      },
+      {
+        code: 'bg',
+        language: 'bg-BG',
+        name: 'Български',
+      },
+      {
+        code: 'hi',
+        language: 'hi-IN',
+        name: 'हिन्दी',
+      },
+      {
+        code: 'gl',
+        language: 'gl-ES',
+        name: 'Galego',
+      },
+      {
+        code: 'vi',
+        language: 'vi-VN',
+        name: 'Tiếng Việt',
+      },
     ],
     defaultLocale: 'en',
     vueI18n: './i18n.config.ts',
@@ -118,21 +157,20 @@ export default defineNuxtConfig({
     },
   },
   nitro: {
+    imports: {
+      autoImport: false,
+    },
     esbuild: {
       options: {
-        // to support big int
-        target: 'node20',
+        target: 'node24',
       },
-    },
-    alias: {
-      '#db': fileURLToPath(new URL('./server/database/', import.meta.url)),
     },
     externals: {
       traceInclude: [fileURLToPath(new URL('./cli/index.ts', import.meta.url))],
     },
   },
   alias: {
-    // for typecheck reasons (https://github.com/nuxt/cli/issues/323)
     '#db': fileURLToPath(new URL('./server/database/', import.meta.url)),
+    '#cli': fileURLToPath(new URL('./cli', import.meta.url)),
   },
 });

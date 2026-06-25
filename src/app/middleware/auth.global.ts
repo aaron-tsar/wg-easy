@@ -4,25 +4,29 @@ export default defineNuxtRouteMiddleware(async (to) => {
     return;
   }
 
-  const authStore = useAuthStore();
-  const userData = await authStore.getSession();
+  const event = useRequestEvent();
 
-  // skip login if already logged in
-  if (to.path === '/login') {
-    if (userData?.username) {
+  const authStore = useAuthStore();
+  authStore.userData = await authStore.getSession(event);
+
+  const isLoginRoute = to.path === '/login' || to.path === '/login/2fa';
+
+  // skip login pages if already logged in
+  if (isLoginRoute) {
+    if (authStore.userData?.username) {
       return navigateTo('/', { redirectCode: 302 });
     }
     return;
   }
 
   // Require auth for every page other than Login
-  if (!userData?.username) {
+  if (!authStore.userData?.username) {
     return navigateTo('/login', { redirectCode: 302 });
   }
 
   // Check for admin access
   if (to.path.startsWith('/admin')) {
-    if (!hasPermissions(userData, 'admin', 'any')) {
+    if (!hasPermissions(authStore.userData, 'admin', 'any')) {
       return abortNavigation('Not allowed to access Admin Panel');
     }
   }

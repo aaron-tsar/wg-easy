@@ -1,9 +1,18 @@
+import { createError, defineEventHandler } from 'h3';
+
+import Database from '#server/utils/Database';
+import { useWGSession } from '#server/utils/session';
+import type { SharedPublicUser } from '#shared/utils/permissions';
+
 export default defineEventHandler(async (event) => {
   const session = await useWGSession(event);
 
-  if (!session.data.userId) {
+  if (!session.data.userId || session.data.pendingLogin) {
     // not logged in
-    return null;
+    throw createError({
+      statusCode: 401,
+      statusMessage: 'Not authenticated',
+    });
   }
 
   const user = await Database.users.get(session.data.userId);
@@ -11,6 +20,12 @@ export default defineEventHandler(async (event) => {
     throw createError({
       statusCode: 404,
       statusMessage: 'Not found in Database',
+    });
+  }
+  if (!user.enabled) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'User is disabled',
     });
   }
 
@@ -21,5 +36,7 @@ export default defineEventHandler(async (event) => {
     name: user.name,
     email: user.email,
     totpVerified: user.totpVerified,
-  };
+    oauthProvider: user.oauthProvider,
+    hasPassword: user.password !== null,
+  } satisfies SharedPublicUser;
 });
