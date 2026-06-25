@@ -1,80 +1,63 @@
-# Project Overview & Product Development Requirements (PDR)
+# Project Overview & Product Development Requirements
 
-## Project Overview
-`wg-easy` is an all-in-one, self-hosted solution for managing WireGuard VPN servers with ease through a user-friendly web interface. It simplifies the setup, configuration, and management of WireGuard clients, making VPN administration accessible to users without deep technical expertise.
+`wg-easy` is a self-hosted WireGuard admin app with a Nuxt frontend, Nitro API, SQLite-backed persistence, and Docker-first deployment. The current fork matches upstream master plus a local bandwidth settings addition in the general config path.
 
-**Goals:**
-- Provide a simple, intuitive web interface for WireGuard management.
-- Automate common WireGuard configuration tasks.
-- Ensure a secure and robust VPN solution.
-- Offer multi-language support for global accessibility.
-- Support various deployment methods, primarily Docker.
+## Current Product State
 
-**Target Users:**
-- System administrators looking for an easy way to manage WireGuard VPNs.
-- Individuals and small businesses needing a secure, self-hosted VPN solution.
-- Developers seeking a convenient tool for secure remote access.
+| Area              | Current state                                                                                  |
+| ----------------- | ---------------------------------------------------------------------------------------------- |
+| Web app           | Nuxt 4 + Vue 3 app with file-based routing under `src/app/pages`                               |
+| Auth              | Session login, OAuth link/unlink, TOTP 2FA, pending-2FA flow                                   |
+| Client management | CRUD, QR code, config download, one-time links, expiration, per-client firewall rules          |
+| Admin config      | General settings, interface settings, hooks, user config, CIDR change, interface restart       |
+| Observability     | JSON and Prometheus metrics endpoints plus in-app client transfer charts                       |
+| Localization      | 24 locales in `src/nuxt.config.ts`                                                             |
+| Runtime           | WireGuard config generation, `wg-quick` sync, firewall rebuild, minute cron for expiry cleanup |
+| Database          | libsql/SQLite at `/etc/wireguard/wg-easy.db`                                                   |
+| Docs              | Zensical docs site in `docs/`, previewed with `pnpm docs:preview`                              |
 
-## Product Development Requirements (PDR)
+## Product Requirements
 
 ### Functional Requirements
-- **Client Management:**
-    - Create, read, update, and delete WireGuard clients.
-    - Generate QR codes for client configuration.
-    - Generate one-time links for client configuration download.
-    - Configure client bandwidth limits (enable/disable, download, upload).
-- **Server Configuration:**
-    - Configure WireGuard interface settings (e.g., CIDR, MTU, DNS).
-    - Manage pre/post-up/down hooks.
-- **Authentication:**
-    - User registration and login.
-    - Two-Factor Authentication (TOTP) support.
-- **Internationalization:**
-    - Support for 16 locales (i18n).
-- **Monitoring:**
-    - Display VPN client metrics (data transfer, last handshake).
-    - Prometheus and JSON metrics endpoints.
-- **Setup Wizard:**
-    - Guided initial setup process for new installations.
-- **AmneziaWG Support:**
-    - Integration with AmneziaWG for enhanced features.
+
+| Requirement        | Evidence in code                                                                                                                                | Acceptance criteria                                                                                |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Client CRUD        | `src/server/api/client/*`, `src/app/pages/index.vue`, `src/app/pages/clients/[id].vue`                                                          | Admin can create, edit, enable, disable, and delete clients                                        |
+| Client artifacts   | QR and config routes in `src/server/api/client/[clientId]/*`                                                                                    | Users can download configs and scan QR codes                                                       |
+| One-time links     | `src/server/api/client/[clientId]/generateOneTimeLink.post.ts`, `src/server/routes/cnf/[oneTimeLink].ts`                                        | Link expiry is shortened after first download with a 10-second grace window                        |
+| Setup flow         | `src/server/api/setup/*`, `src/app/pages/setup/*`                                                                                               | Fresh installs can complete guided setup and migration                                             |
+| Authentication     | `src/server/api/auth/*`, `src/app/pages/login*`                                                                                                 | Password auth, OAuth, and 2FA flows work without leaking session state                             |
+| Profile management | `src/app/pages/me.vue`, `src/server/api/me/*`                                                                                                   | User can edit profile, password, TOTP, and OAuth link state                                        |
+| Server config      | `src/server/api/admin/interface*`, `src/server/api/admin/hooks*`                                                                                | Admin can update interface and hook settings and restart the interface                             |
+| Metrics            | `src/server/routes/metrics/*`                                                                                                                   | JSON and Prometheus outputs reflect current WireGuard state                                        |
+| Bandwidth settings | `src/server/database/repositories/general/*`, `src/server/api/admin/general.post.ts`, `src/server/database/migrations/0007_bandwidth_limit.sql` | Bandwidth enable/download/upload settings are stored, validated, and returned by admin config APIs |
+| Localization       | `src/nuxt.config.ts`                                                                                                                            | App ships with 24 configured locales and default locale `en`                                       |
+| CLI                | `src/cli/*`, `src/cli/build.js`                                                                                                                 | `db:admin:reset`, `clients:list`, and `clients:qr` run from the bundled CLI                        |
 
 ### Non-Functional Requirements
-- **Performance:**
-    - Responsive web UI.
-    - Efficient WireGuard configuration application.
-- **Security:**
-    - Secure password hashing (Argon2).
-    - Role-Based Access Control (RBAC).
-    - Protection against common web vulnerabilities.
-- **Usability:**
-    - Intuitive and clean user interface.
-    - Clear error messages and feedback.
-- **Maintainability:**
-    - Clean codebase with clear separation of concerns.
-    - Comprehensive documentation.
-- **Scalability:**
-    - Designed to manage a moderate number of VPN clients.
-- **Compatibility:**
-    - Runs effectively within Docker environments.
-    - Compatible with modern web browsers.
 
-## Key Features List
-- WireGuard client CRUD operations.
-- QR code generation for quick client setup.
-- One-time links for secure configuration sharing.
-- 2FA/TOTP for enhanced security.
-- Multi-language support (16 locales).
-- Real-time client metrics dashboard.
-- Prometheus and JSON metric endpoints.
-- Integrated setup wizard.
-- Docker-first deployment.
-- AmneziaWG support.
+| Requirement     | What the code already does                                                                                                    |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Security        | Argon2 password hashing, permission checks, validated bodies and route params, session cookies, sanitized QR/config filenames |
+| Reliability     | DB connect happens before WireGuard startup; Nitro close hook shuts WireGuard down cleanly                                    |
+| Maintainability | Repository/service split under `src/server/database/repositories/*`, reusable UI components, shared validation helpers        |
+| Compatibility   | Docker image runs on node24-based Alpine image with `dumb-init`, `wireguard-tools`, and iptables support                      |
+| UX              | Responsive panels, dialogs, toasts, and mobile-aware auth/client pages                                                        |
+| Documentation   | Root docs and site content are separate; docs preview is containerized                                                        |
 
-## Tech Stack Summary
-- **Frontend**: Nuxt 3, Vue 3, Pinia (state management), Tailwind CSS (styling), Radix Vue (UI components).
-- **Backend**: Nitro/H3 (server framework), Drizzle ORM (database abstraction), SQLite (database).
-- **Containerization**: Docker.
-- **Version Control**: Git.
-- **CI/CD**: GitHub Actions.
-- **VPN Core**: WireGuard, AmneziaWG.
+## Scope Notes
+
+- Bandwidth settings are real in storage and admin APIs, but there is no runtime traffic shaping in the current code path. Do not document it as enforced bandwidth limiting.
+- `README.md` is current enough after the upstream sync and does not need a rewrite for this pass.
+- The codebase has moved beyond Nuxt 3. Any docs that still say Nuxt 3 or 16 locales are stale.
+
+## Target Tech Stack
+
+| Layer     | Stack                                                 |
+| --------- | ----------------------------------------------------- |
+| Frontend  | Nuxt 4, Vue 3, Pinia, Tailwind CSS, Radix Vue, VueUse |
+| Backend   | Nitro/H3, Drizzle ORM, libsql client                  |
+| Database  | SQLite file at `/etc/wireguard/wg-easy.db`            |
+| CLI       | `citty`, `esbuild`, `tsx`                             |
+| Container | Docker, Alpine, `dumb-init`                           |
+| VPN       | WireGuard, optional AmneziaWG detection               |

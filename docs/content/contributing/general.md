@@ -17,7 +17,7 @@ Make sure to select `edge` in the dropdown menu at the top. Navigate to the page
 Alternatively you can make the changes locally. For that you'll need to have Docker installed. Run
 
 ```sh
-pnpm docs:serve
+pnpm docs:preview
 ```
 
 This serves the documentation on your local machine on port `8080`. Each change will be hot-reloaded onto the page you view, just edit, save and look at the result.
